@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campus Voice - AI Powered</title>
+    <style>
+        /* CSS Styles for a clean look */
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { text-align: center; color: #1a73e8; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #666; font-size: 0.9rem; margin-top: 0; margin-bottom: 20px;}
+        
+        label { font-weight: 600; margin-top: 15px; display: block; color: #444; }
+        select, textarea { width: 100%; padding: 12px; margin-top: 8px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-family: inherit; }
+        textarea { resize: vertical; }
+        
+        button { width: 100%; padding: 14px; background-color: #1a73e8; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 25px; transition: background 0.2s; }
+        button:hover { background-color: #1557b0; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        #status { text-align: center; margin-top: 15px; font-weight: bold; font-size: 0.95rem; min-height: 24px;}
+        .ai-badge { display: inline-block; background: #e8f0fe; color: #1a73e8; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 5px; vertical-align: middle; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>📢 Campus Voice <span class="ai-badge">AI Enabled</span></h2>
+    <p class="subtitle">Anonymous Student Feedback</p>
+    
+    <label>Category</label>
+    <select id="category">
+        <option value="Academics">Academics</option>
+        <option value="Infrastructure">Infrastructure (Wi-Fi/Labs)</option>
+        <option value="Canteen">Canteen & Food</option>
+        <option value="Hostel">Hostel & Stay</option>
+        <option value="Other">Other</option>
+    </select>
+
+    <label>Your Feedback</label>
+    <textarea id="message" rows="4" placeholder="Describe the issue here..."></textarea>
+
+    <button id="submitBtn" onclick="submitData()">🚀 Submit Feedback</button>
+    <div id="status"></div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+
+    // --- YOUR FIREBASE CONFIG ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyCqlRYCpVBSbAM2t2bU8IKaHQqxxCHoHX0",
+        authDomain: "studentfeedback-mbu.firebaseapp.com",
+        projectId: "studentfeedback-mbu",
+        storageBucket: "studentfeedback-mbu.firebasestorage.app",
+        messagingSenderId: "138139095564",
+        appId: "1:138139095564:web:342a751973469c35bad429",
+        measurementId: "G-7Y55G2WSCK"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    signInAnonymously(auth).catch((error) => {
+        console.error("Login Failed:", error);
+    });
+
+    // --- YOUR GEMINI AI KEY ---
+    const GEMINI_API_KEY = "AIzaSyBNkJ_Sf9ytd5lkPyJljcLIuDdB42SqoVw"; 
+
+    // Function to talk to Gemini
+    async function analyzeText(text) {
+        // We use the "gemini-1.5-flash" model because it is fast and free
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+        
+        // This is the instruction we send to the AI
+        const prompt = {
+            contents: [{
+                parts: [{
+                    text: `Analyze this student feedback: "${text}". 
+                    1. Classify sentiment as exactly one word: "Positive", "Negative", or "Neutral".
+                    2. Write a very short summary (max 4 words).
+                    Format the output strictly like this: Sentiment | Summary
+                    Example: Negative | Cold food in canteen`
+                }]
+            }]
+        };
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(prompt)
+            });
+            const data = await response.json();
+            
+            // Extract the answer from Gemini's complex JSON response
+            const resultText = data.candidates[0].content.parts[0].text.trim();
+            
+            // Split the answer by the "|" symbol
+            const parts = resultText.split('|');
+            return {
+                sentiment: parts[0]?.trim() || "Neutral",
+                summary: parts[1]?.trim() || "No summary"
+            };
+        } catch (error) {
+            console.error("AI Error:", error);
+            return { sentiment: "Neutral", summary: "Analysis Failed" };
+        }
+    }
+
+    // Main Submit Function
+    window.submitData = async function() {
+        const cat = document.getElementById("category").value;
+        const msg = document.getElementById("message").value;
+        const status = document.getElementById("status");
+        const btn = document.getElementById("submitBtn");
+
+        if(!msg) {
+            status.innerText = "⚠️ Please write a message!";
+            status.style.color = "#d93025";
+            return;
+        }
+
+        // 1. Show "Analyzing" status
+        btn.disabled = true;
+        status.innerText = "🤖 AI is analyzing...";
+        status.style.color = "#666";
+        
+        try {
+            // 2. Call Gemini API
+            const aiResult = await analyzeText(msg);
+            
+            // 3. Save everything to Firestore
+            await addDoc(collection(db, "feedback"), {
+                category: cat,
+                message: msg,
+                timestamp: serverTimestamp(),
+                ai_sentiment: aiResult.sentiment,  // e.g., "Negative"
+                ai_summary: aiResult.summary       // e.g., "Broken Wi-Fi"
+            });
+            
+            // 4. Show Success
+            status.innerText = `✅ Sent! (Detected: ${aiResult.sentiment})`;
+            status.style.color = "green";
+            document.getElementById("message").value = ""; 
+            
+            setTimeout(() => { 
+                status.innerText = ""; 
+                btn.disabled = false;
+            }, 3000);
+
+        } catch (e) {
+            console.error("Error:", e);
+            status.innerText = "❌ Error sending data.";
+            status.style.color = "red";
+            btn.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>
