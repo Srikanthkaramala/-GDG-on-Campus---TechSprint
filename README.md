@@ -44,10 +44,12 @@ We built a **Zero-Touch Feedback Loop**:
 ## 📸 Screenshots
 
 ### 1. Student View (AI Analysis)
-*(Upload your screenshot here)*
+
+<img width="603" height="342" alt="image" src="https://github.com/user-attachments/assets/fb76290a-c582-4263-a310-8da2c93a7865" />
 
 ### 2. Admin Dashboard (Analytics)
-*(Upload your screenshot here)*
+
+<img width="720" height="342" alt="image" src="https://github.com/user-attachments/assets/5fc6b240-ec58-4af2-bb9e-0f7909f96157" />
 
 ---
 
